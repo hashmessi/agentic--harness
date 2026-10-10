@@ -1,0 +1,4 @@
+.claude-flow/
+.worktrees/
+node_modules/
+*.bak
