@@ -41,6 +41,7 @@ Phase skills (load the one that matches the phase; they are small): `repo-intel`
 - Prefer a fresh-context reviewer: the `hostile-reviewer` subagent (Claude Code / OpenCode) or the `hostile-review` skill. Give it the task and the base ref; it reviews `git diff` read-only.
 - Otherwise switch to Reviewer role yourself and run the §8 checklist against the full diff.
 - Fix every confirmed finding; note rejected ones with a one-line reason.
+- Large change (4+ files or 150+ changed lines): after fixes and a passing gate, run `bash ~/agent-harness/bin/review-stamp.sh`. The Claude Code Stop hook refuses to finish a large change without a stamp for its current state; any later edit voids it, so rerun the gate and stamp again.
 
 ## 7. FINALIZE
 - Rerun `bash scripts/verify.sh` — must exit 0 (or report exactly what fails and why it's out of scope/pre-existing).

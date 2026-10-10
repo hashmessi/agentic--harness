@@ -49,6 +49,7 @@ Universal principles live in the skill text; tool-specific behavior lives only i
 | Control | Mechanism | Enforced by |
 |---|---|---|
 | Unverified "done" | Stop hook runs the gate state check | Claude Code hook (hard) |
+| Large change finished without review (4+ files or 150+ lines; `HARNESS_REVIEW_FILES` / `HARNESS_REVIEW_LINES`) | Stop hook needs `bin/review-stamp.sh` for the current tree. Self-attested: it forces the step, it cannot prove the review was good. | Claude Code hook |
 | Destructive/outward commands (force-push, `reset --hard`, `rm -rf` of root/home/`.`, `--no-verify`, `HARNESS_ALLOW_*`, publish, destructive SQL, pipe-to-shell) | `hooks/guard-bash.mjs` returns `ask` | Claude Code hook (hard); other CLIs: `safe-autonomy` rule |
 | Weakened tests, suppressions, secrets | `scripts/verify.sh` guards | any CLI that runs the gate |
 | Undo | `bin/checkpoint.sh save/rollback` (refs under `refs/harness/ckpt/`, never touches branch/index/stash) | any CLI |

@@ -69,6 +69,29 @@ function editedInside(transcriptPath, root) {
   return false;
 }
 
+// Large changes need a hostile review before "done". Self-attested: `bin/review-stamp.sh` records the tree hash
+// after the review, and any later edit invalidates it. Small changes (under both thresholds) are not asked.
+function reviewGate(root, gitDir, tree, head) {
+  const maxFiles = Number(process.env.HARNESS_REVIEW_FILES || 4);
+  const maxLines = Number(process.env.HARNESS_REVIEW_LINES || 150);
+  let files = 0, lines = 0;
+  const base = head ?? "4b825dc642cb6eb9a060e54bf8d69288fbd0f2d6"; // empty tree on an unborn branch
+  for (const row of git(root, ["diff", "--numstat", base, tree]).split("\n")) {
+    if (!row) continue;
+    const [a, d] = row.split("\t");
+    files++; lines += (Number(a) || 0) + (Number(d) || 0);
+  }
+  if (files < maxFiles && lines < maxLines) return 0;
+  const f = join(gitDir, "harness", "review-stamp");
+  if (existsSync(f) && readFileSync(f, "utf8").trim() === tree) return 0;
+  process.stderr.write(
+    `Harness gate: this change is large (${files} files, ${lines} lines) and has no review of its current state. ` +
+      "Run the hostile-review skill / hostile-reviewer subagent on `git diff`, fix confirmed findings, rerun `bash scripts/verify.sh`, " +
+      "then `bash ~/agent-harness/bin/review-stamp.sh`. If review is not possible, report status PARTIALLY VALIDATED and say why.\n",
+  );
+  return 2;
+}
+
 function main(input) {
   if (input.stop_hook_active || process.env.HARNESS_SKIP_GATE === "1") return 0;
   const cwd = input.cwd || process.cwd();
@@ -97,7 +120,7 @@ function main(input) {
 
   const stampFile = join(gitDir, "harness", "verify-stamp");
   const stamp = existsSync(stampFile) ? readFileSync(stampFile, "utf8").trim() : "";
-  if (stamp === tree) return 0;
+  if (stamp === tree) return reviewGate(root, gitDir, tree, head);
 
   process.stderr.write(
     "Harness gate: the working tree changed since the last fully passing `bash scripts/verify.sh`. " +
