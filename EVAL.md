@@ -32,7 +32,9 @@ Destructive shell commands (force-push, `reset --hard`, `rm -rf` of root/home/`.
 
 - **Phase skills are advisory.** Both agents used only `ship` (INSPECT/VERIFY/FINALIZE) plus the gate. Neither loaded `plan`, `test-first` or `hostile-review`, ran `checkpoint.sh`, or used a fresh-context reviewer; both said so. Only the gate (and, in Claude Code, the Stop and Bash hooks) is mechanically enforced. For one-to-two-file changes this was proportionate; for risky changes nothing forces the review step.
 - **Not measured:** harness-on vs harness-off lift (no baseline arm was run), cost or latency across models, and behavior on larger tasks. Two runs cannot establish a rate.
-- **Not verified live:** the `guard-bash` hook inside a running Claude Code session (unit-tested for its JSON output, and the settings merge is tested in a sandbox HOME; I did not trigger it from a live session). OpenCode and Gemini CLI receive the skills and rules via `sync.sh`, but I did not run those CLIs. Gemini CLI is not installed here.
+- **Guard hook verified live** (`claude -p` in a throwaway repo): `git reset --hard HEAD` was denied with the guard's message and the dirty file was unchanged; `git status --short` ran with no denial.
+- **Review gate** (added after run A/B): large changes need `bin/review-stamp.sh`; covered by `tests/safety.sh`, not yet exercised by a live agent run.
+- **Not verified live:** OpenCode (its default model `exo-free` is deprecated and no other model is configured, so it cannot run here) and Gemini CLI (not installed). Both receive skills and rules via `sync.sh`, which is tested in a sandbox HOME.
 - **Skill triggering** (description optimization with `run_loop.py`) was not run; no skill-creator eval viewer loop was used, because the work is deterministic scripts plus short checklists and the user was not present to review.
 - Fixture limit: float prices that are already below a tie in binary (e.g. `1.005`) still round down; out of scope for the task.
 - `checkpoint.sh rollback` restores files from the snapshot but does not delete files created afterwards (it lists them). Safer, but not a full reset.

@@ -70,6 +70,23 @@ node -e 'const s=require(process.argv[1]);const g=s.hooks?.PreToolUse?.[0];proce
 ls "$SH/.claude/skills" | grep -q safe-autonomy && ok "new skills distributed" || bad "skills distributed"
 HARNESS_TARGET_HOME="$SH" bash "$HARNESS/bin/sync.sh" --check 2>&1 | tail -1 | grep -q 'in sync' && ok "sync is idempotent (--check clean)" || bad "sync idempotence"
 
+echo "== review gate (large changes need a review stamp)"
+RG="$TMP/rg"; mkdir -p "$RG/src" && cd "$RG" && git init -q && git checkout -q -b main 2>/dev/null
+echo '{"name":"rg","scripts":{"test":"node -e 0"}}' >package.json; echo 0 >src/f0.js; git add -A; git commit -qm i
+bash "$HARNESS/bin/harness-init.sh" "$RG" >/dev/null; git add -A; git commit -qm gate
+RGN="$(native "$RG")"; TR="$TMP/rg.jsonl"
+printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"%s/src/f0.js"}}]}}\n' "$RGN" >"$TR"
+rgate() { node "$(native "$HARNESS/hooks/verify-gate.mjs")" <<<"{\"cwd\":\"$RGN\",\"transcript_path\":\"$(native "$TR")\",\"stop_hook_active\":false}" >"$TMP/rg.err" 2>&1; echo $?; }
+echo 1 >src/f0.js; bash scripts/verify.sh >/dev/null 2>&1
+[ "$(rgate)" = 0 ] && ok "small verified change is not asked for review" || bad "small change blocked" "$(cat "$TMP/rg.err")"
+for i in 1 2 3 4; do echo $i >src/f$i.js; done; bash scripts/verify.sh >/dev/null 2>&1
+[ "$(rgate)" = 2 ] && grep -q 'is large (5 files' "$TMP/rg.err" && ok "large verified change is blocked without review" || bad "large change not blocked" "$(cat "$TMP/rg.err")"
+bash "$HARNESS/bin/review-stamp.sh" >/dev/null 2>&1
+[ "$(rgate)" = 0 ] && ok "review stamp releases the gate" || bad "stamp did not release" "$(cat "$TMP/rg.err")"
+echo changed >src/f1.js; bash scripts/verify.sh >/dev/null 2>&1
+[ "$(rgate)" = 2 ] && ok "edit after review voids the stamp" || bad "stale stamp accepted"
+HARNESS_REVIEW_FILES=50 HARNESS_REVIEW_LINES=9999 bash -c "[ \"\$(node '$(native "$HARNESS/hooks/verify-gate.mjs")' <<<'{\"cwd\":\"$RGN\",\"transcript_path\":\"$(native "$TR")\"}' >/dev/null 2>&1; echo \$?)\" = 0 ]" && ok "thresholds are configurable" || bad "thresholds"
+
 echo "== skills lint"
 cd "$HARNESS"
 for d in skills/*/; do
